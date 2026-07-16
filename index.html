@@ -1,0 +1,826 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Concept Rating & Feedback App</title>
+    <!-- Tailwind CSS for modern rapid UI styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts: Inter for slick clean typography -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Chart.js for real-time beautiful feedback analytics -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Lucide Icons for clean aesthetic interface icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        /* Custom scrollbar styling for seamless image strips on mobile */
+        .hide-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .hide-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-900 min-h-screen flex flex-col antialiased">
+
+    <!-- Navigation Bar -->
+    <header class="bg-white border-b border-slate-200 sticky top-0 z-50">
+        <div class="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between">
+            <div class="flex items-center space-x-3">
+                <div class="bg-indigo-600 text-white p-2 rounded-xl">
+                    <i data-lucide="layers" class="w-6 h-6"></i>
+                </div>
+                <div>
+                    <h1 class="font-bold text-lg leading-tight">ConceptRater</h1>
+                    <p class="text-xs text-slate-500">Design Comparison and Evaluation</p>
+                </div>
+            </div>
+            
+            <!-- Navigation Tabs -->
+            <div class="flex space-x-1 bg-slate-100 p-1 rounded-xl">
+                <button id="tab-survey" onclick="switchMode('survey')" class="px-4 py-2 text-sm font-medium rounded-lg transition duration-200 flex items-center space-x-2 bg-white text-slate-800 shadow-sm">
+                    <i data-lucide="clipboard-list" class="w-4 h-4 text-indigo-600"></i>
+                    <span>Опитування</span>
+                </button>
+                <button id="tab-admin" onclick="switchMode('admin')" class="px-4 py-2 text-sm font-medium rounded-lg transition duration-200 flex items-center space-x-2 text-slate-600 hover:text-slate-800">
+                    <i data-lucide="bar-chart-3" class="w-4 h-4"></i>
+                    <span>Панель керування</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Container -->
+    <main class="flex-grow max-w-6xl w-full mx-auto px-4 py-8">
+
+        <!-- Custom Alert Notification (Replacing standard alert()) -->
+        <div id="toast" class="fixed bottom-5 right-5 bg-slate-900 text-white px-5 py-3 rounded-xl shadow-2xl transition-all duration-300 transform translate-y-20 opacity-0 flex items-center space-x-3 z-50">
+            <span id="toast-icon" class="text-emerald-400"><i data-lucide="check-circle" class="w-5 h-5"></i></span>
+            <span id="toast-message" class="text-sm font-medium">Saved successfully!</span>
+        </div>
+
+        <!-- SECTION: SURVEY MODE -->
+        <section id="section-survey" class="space-y-6">
+            <!-- Header Progress -->
+            <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div>
+                    <span class="text-xs font-semibold text-indigo-600 uppercase tracking-wider">Concept Testing</span>
+                    <h2 id="survey-concept-title" class="text-2xl font-bold text-slate-800 mt-1">Назва концепту</h2>
+                    <p id="survey-concept-desc" class="text-sm text-slate-500 mt-1">Опис концепту...</p>
+                </div>
+                <div class="flex items-center space-x-3 bg-slate-50 px-4 py-2 rounded-xl border border-slate-100 self-start md:self-auto">
+                    <div class="text-right">
+                        <span class="text-xs text-slate-400 block font-medium">Progress</span>
+                        <span id="survey-progress-text" class="text-sm font-bold text-slate-700">1 з 3</span>
+                    </div>
+                    <div class="w-24 bg-slate-200 h-2 rounded-full overflow-hidden">
+                        <div id="survey-progress-bar" class="bg-indigo-600 h-full transition-all duration-300" style="width: 33%"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Responsive Image Grid Section -->
+            <div class="space-y-2">
+                <div class="flex justify-between items-center px-1">
+                    <span class="text-xs text-slate-400 font-semibold uppercase flex items-center gap-1">
+                        <i data-lucide="eye" class="w-3.5 h-3.5"></i> 3 Concept Views
+                    </span>
+                    <span class="text-xs text-slate-400 md:hidden flex items-center gap-1">
+                        Swipe <i data-lucide="arrow-right" class="w-3 h-3"></i>
+                    </span>
+                </div>
+                
+                <!-- 3 Images Layout -->
+                <!-- Desktop: 3-column Grid | Mobile: Horizontal Scrollable Strip for best usability -->
+                <div id="survey-images-container" class="grid grid-cols-1 md:grid-cols-3 gap-4 overflow-x-auto md:overflow-x-visible snap-x snap-mandatory flex md:grid hide-scrollbar pb-2 md:pb-0">
+                    <!-- Images dynamically rendered here -->
+                </div>
+            </div>
+
+            <!-- Centralized Rating Block -->
+            <div class="bg-white p-8 rounded-2xl border border-slate-200 shadow-sm text-center max-w-2xl mx-auto space-y-4">
+                <h3 class="text-lg font-semibold text-slate-800">How appealing is this to you?</h3>
+                <p class="text-xs text-slate-400 uppercase tracking-wide">Please rate from 1 to 5 stars.</p>
+                
+                <!-- Star Rating Interactive Block -->
+                <div class="flex justify-center items-center space-x-2 py-4">
+                    <button onclick="setRating(1)" onmouseover="hoverStars(1)" onmouseleave="resetStars()" class="star-btn p-1 transition duration-150 transform hover:scale-110 focus:outline-none">
+                        <i data-lucide="star" class="w-10 h-10 text-slate-300 fill-transparent transition duration-200"></i>
+                    </button>
+                    <button onclick="setRating(2)" onmouseover="hoverStars(2)" onmouseleave="resetStars()" class="star-btn p-1 transition duration-150 transform hover:scale-110 focus:outline-none">
+                        <i data-lucide="star" class="w-10 h-10 text-slate-300 fill-transparent transition duration-200"></i>
+                    </button>
+                    <button onclick="setRating(3)" onmouseover="hoverStars(3)" onmouseleave="resetStars()" class="star-btn p-1 transition duration-150 transform hover:scale-110 focus:outline-none">
+                        <i data-lucide="star" class="w-10 h-10 text-slate-300 fill-transparent transition duration-200"></i>
+                    </button>
+                    <button onclick="setRating(4)" onmouseover="hoverStars(4)" onmouseleave="resetStars()" class="star-btn p-1 transition duration-150 transform hover:scale-110 focus:outline-none">
+                        <i data-lucide="star" class="w-10 h-10 text-slate-300 fill-transparent transition duration-200"></i>
+                    </button>
+                    <button onclick="setRating(5)" onmouseover="hoverStars(5)" onmouseleave="resetStars()" class="star-btn p-1 transition duration-150 transform hover:scale-110 focus:outline-none">
+                        <i data-lucide="star" class="w-10 h-10 text-slate-300 fill-transparent transition duration-200"></i>
+                    </button>
+                </div>
+
+                <!-- Rating labels dynamically matching choices -->
+                <div class="h-6">
+                    <span id="rating-description" class="text-sm font-medium text-slate-500 transition duration-150">&nbsp;</span>
+                </div>
+
+                <!-- Feedback Text Area (Optional comments) -->
+                <div class="pt-2 text-left">
+                    <label for="survey-comment" class="text-xs font-semibold text-slate-500 uppercase block mb-1">Коментар (необов'язково):</label>
+                    <textarea id="survey-comment" rows="2" placeholder="Що саме сподобалось або не сподобалось у цьому концепті..." class="w-full text-sm px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none resize-none transition duration-150"></textarea>
+                </div>
+
+                <!-- Navigation Controls -->
+                <div class="flex items-center justify-between pt-6 border-t border-slate-100">
+                    <button id="btn-prev" onclick="prevStep()" class="px-5 py-2.5 text-sm font-semibold rounded-xl text-slate-600 hover:bg-slate-100 transition duration-150 flex items-center space-x-1.5 disabled:opacity-30 disabled:pointer-events-none">
+                        <i data-lucide="arrow-left" class="w-4 h-4"></i>
+                        <span>Назад</span>
+                    </button>
+                    
+                    <button id="btn-next" onclick="submitAndNext()" class="px-6 py-2.5 text-sm font-semibold bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl shadow-lg shadow-indigo-100 transition duration-150 flex items-center space-x-1.5 disabled:opacity-50 disabled:pointer-events-none">
+                        <span id="btn-next-text">Наступний концепт</span>
+                        <i data-lucide="arrow-right" class="w-4 h-4"></i>
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <!-- SECTION: THANK YOU / SUCCESS STATE -->
+        <section id="section-thanks" class="hidden max-w-md mx-auto text-center py-12 space-y-6">
+            <div class="w-20 h-20 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto shadow-inner animate-bounce">
+                <i data-lucide="party-popper" class="w-10 h-10"></i>
+            </div>
+            <div class="space-y-2">
+                <h2 class="text-3xl font-extrabold text-slate-800">Дякуємо за оцінку!</h2>
+                <p class="text-slate-500">Your vote has been successfully recorded. Thank you for helping us choose the best design.</p>
+            </div>
+            <div class="pt-4 flex flex-col sm:flex-row gap-3 justify-center">
+                <button onclick="restartSurvey()" class="px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-xl transition shadow-lg shadow-indigo-100 flex items-center justify-center space-x-2">
+                    <i data-lucide="rotate-ccw" class="w-4 h-4"></i>
+                    <span>Rate Again</span>
+                </button>
+                <button onclick="switchMode('admin')" class="px-6 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-xl transition flex items-center justify-center space-x-2">
+                    <i data-lucide="bar-chart-3" class="w-4 h-4"></i>
+                    <span>Results</span>
+                </button>
+            </div>
+        </section>
+
+        <!-- SECTION: ADMIN & CREATOR CONTROL PANEL -->
+        <section id="section-admin" class="hidden space-y-8">
+            
+            <!-- Dashboard Grid Stats -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex items-center space-x-4">
+                    <div class="p-3 bg-indigo-50 text-indigo-600 rounded-xl">
+                        <i data-lucide="users" class="w-6 h-6"></i>
+                    </div>
+                    <div>
+                        <span class="text-xs text-slate-400 block font-semibold uppercase tracking-wider">Всього оцінило осіб</span>
+                        <span id="stat-total-votes" class="text-2xl font-bold text-slate-800">0</span>
+                    </div>
+                </div>
+                <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex items-center space-x-4">
+                    <div class="p-3 bg-amber-50 text-amber-600 rounded-xl">
+                        <i data-lucide="award" class="w-6 h-6"></i>
+                    </div>
+                    <div>
+                        <span class="text-xs text-slate-400 block font-semibold uppercase tracking-wider">Найкращий концепт</span>
+                        <span id="stat-best-concept" class="text-2xl font-bold text-slate-800">—</span>
+                    </div>
+                </div>
+                <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex items-center space-x-4">
+                    <div class="p-3 bg-rose-50 text-rose-600 rounded-xl">
+                        <i data-lucide="database" class="w-6 h-6"></i>
+                    </div>
+                    <div>
+                        <span class="text-xs text-slate-400 block font-semibold uppercase tracking-wider">Експорт інформації</span>
+                        <button onclick="exportToCSV()" class="mt-1 px-3 py-1.5 text-xs font-semibold bg-slate-900 hover:bg-slate-800 text-white rounded-lg transition duration-200 flex items-center space-x-1">
+                            <i data-lucide="download" class="w-3.5 h-3.5"></i>
+                            <span>Завантажити CSV</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Main Admin Content Tabs -->
+            <div class="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+                <div class="border-b border-slate-200 bg-slate-50/50 px-6 py-4 flex items-center justify-between flex-wrap gap-4">
+                    <div class="flex space-x-4">
+                        <button id="admin-subtab-results" onclick="switchAdminTab('results')" class="text-sm font-semibold text-indigo-600 border-b-2 border-indigo-600 pb-4 -mb-4">Аналітика голосів</button>
+                        <button id="admin-subtab-editor" onclick="switchAdminTab('editor')" class="text-sm font-medium text-slate-500 hover:text-slate-800 pb-4 -mb-4">Редактор концептів</button>
+                    </div>
+                    <button onclick="resetAllVotesPrompt()" class="text-xs font-semibold text-rose-600 hover:text-rose-700 flex items-center space-x-1">
+                        <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+                        <span>Скинути всі голоси</span>
+                    </button>
+                </div>
+
+                <div class="p-6">
+                    <!-- Analytics Sub-tab -->
+                    <div id="admin-results-panel" class="space-y-8">
+                        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                            <!-- Left: Score Bar Chart -->
+                            <div class="space-y-4">
+                                <h3 class="text-base font-bold text-slate-800 flex items-center gap-1.5">
+                                    <i data-lucide="trending-up" class="w-4 h-4 text-indigo-600"></i> Середній бал кожного концепту
+                                </h3>
+                                <div class="h-64 flex items-center justify-center border border-slate-100 rounded-xl p-4 bg-slate-50/30">
+                                    <canvas id="chart-average"></canvas>
+                                </div>
+                            </div>
+                            <!-- Right: Detailed Star breakdown -->
+                            <div class="space-y-4">
+                                <h3 class="text-base font-bold text-slate-800 flex items-center gap-1.5">
+                                    <i data-lucide="pie-chart" class="w-4 h-4 text-indigo-600"></i> Загальний розподіл оцінок
+                                </h3>
+                                <div class="h-64 flex items-center justify-center border border-slate-100 rounded-xl p-4 bg-slate-50/30">
+                                    <canvas id="chart-stars-breakdown"></canvas>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Real-time feedback logs -->
+                        <div class="space-y-3">
+                            <h3 class="text-base font-bold text-slate-800 flex items-center gap-1.5">
+                                <i data-lucide="message-square" class="w-4 h-4 text-indigo-600"></i> Останні коментарі та відгуки
+                            </h3>
+                            <div id="feedback-logs" class="space-y-3 max-h-60 overflow-y-auto pr-2">
+                                <!-- Comment blocks populated here -->
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Editor Sub-tab -->
+                    <div id="admin-editor-panel" class="hidden space-y-6">
+                        <div class="bg-indigo-50 border border-indigo-100 p-4 rounded-xl flex gap-3">
+                            <i data-lucide="info" class="w-5 h-5 text-indigo-600 shrink-0 mt-0.5"></i>
+                            <p class="text-xs text-indigo-800 leading-relaxed">
+                                Тут ви можете вказати власні назви концептів та посилання на картинки (наприклад, з Unsplash, Pinterest або вашого хостингу). 
+                                Кожен концепт обов'язково повинен мати рівно 3 посилання на зображення.
+                            </p>
+                        </div>
+
+                        <!-- Concepts Form Fields dynamically generated -->
+                        <div id="editor-concepts-list" class="space-y-6">
+                            <!-- Dynamically generated inputs for concept names and images -->
+                        </div>
+
+                        <div class="pt-4 border-t border-slate-100 flex justify-end space-x-3">
+                            <button onclick="restoreDefaultConcepts()" class="px-5 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-100 rounded-xl transition duration-150">
+                                Відновити стандартні
+                            </button>
+                            <button onclick="saveConceptsFromEditor()" class="px-6 py-2.5 text-sm font-semibold bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl shadow-lg shadow-indigo-100 transition duration-150 flex items-center space-x-1.5">
+                                <i data-lucide="save" class="w-4 h-4"></i>
+                                <span>Зберегти зміни</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-white border-t border-slate-200 py-6 text-center text-xs text-slate-400">
+        <div class="max-w-6xl mx-auto px-4">
+            <p>© 2026 ConceptRater Inc. Усі права захищено. Безкоштовний автономний клієнт опитування.</p>
+        </div>
+    </footer>
+
+    <script>
+        // Default high-quality mockup concepts to showcase immediately
+        const DEFAULT_CONCEPTS = [
+            {
+                id: "concept-1",
+                name: "THE HEART OF AMSTERDAM",
+                desc: "Світлі кольори, натуральне дерево, великі вікна та максимум затишку у вітальні.",
+                images: [
+                    "https://github.com/iuliiagotovtseva-cell/iuliiagotovtseva-cell.github.io/blob/main/Amsterdam%201.1.png",
+                    "https://github.com/iuliiagotovtseva-cell/iuliiagotovtseva-cell.github.io/blob/main/box",
+                    "https://github.com/iuliiagotovtseva-cell/iuliiagotovtseva-cell.github.io/blob/main/concept"
+                ]
+            },
+            {
+                id: "concept-2",
+                name: "Концепт Б: Сучасний індастріал лофт",
+                desc: "Груба цегла, темний метал, відкриті комунікації та шкіряні акценти для сучасних квартир.",
+                images: [
+                    "https://images.unsplash.com/photo-1600210492486-724fe5c67fb0?auto=format&fit=crop&w=600&q=80",
+                    "https://images.unsplash.com/photo-1600121848594-d8644e57abab?auto=format&fit=crop&w=600&q=80",
+                    "https://images.unsplash.com/photo-1600566752355-35792bedcfea?auto=format&fit=crop&w=600&q=80"
+                ]
+            },
+            {
+                id: "concept-3",
+                name: "Концепт В: Неокласичний шик",
+                desc: "Витончена ліпнина, мармур, золоті деталі та розкішна геометрія меблів.",
+                images: [
+                    "https://images.unsplash.com/photo-1513694203232-719a280e022f?auto=format&fit=crop&w=600&q=80",
+                    "https://images.unsplash.com/photo-1484101403633-562f891dc89a?auto=format&fit=crop&w=600&q=80",
+                    "https://images.unsplash.com/photo-1505691938895-1758d7feb511?auto=format&fit=crop&w=600&q=80"
+                ]
+            }
+        ];
+
+        // Simulated Database State using localStorage
+        let appState = {
+            concepts: JSON.parse(localStorage.getItem('cr_concepts')) || DEFAULT_CONCEPTS,
+            votes: JSON.parse(localStorage.getItem('cr_votes')) || []
+        };
+
+        // Current user survey flow state
+        let currentStep = 0; // Index of the concept currently being rated
+        let currentRating = 0; // Value from 1 to 5 stars selected
+        let chartInstances = {}; // Holding references to ChartJS charts to easily update them
+
+        // STAR DESCRIPTIONS TO MATCH EMOTIONS
+        const STAR_LABELS = {
+            1: "Взагалі не подобається 😐",
+            2: "Має право на життя 🤨",
+            3: "Непогано, але не супер 🙂",
+            4: "Дуже гарний дизайн! 😍",
+            5: "Це шедевр, хочу собі! 🚀"
+        };
+
+        window.onload = function() {
+            lucide.createIcons();
+            initSurvey();
+            renderAdminPanel();
+        };
+
+        // TOAST NOTIFICATIONS (Replacing alerts for clean user flows)
+        function showToast(message, isError = false) {
+            const toast = document.getElementById('toast');
+            const toastMsg = document.getElementById('toast-message');
+            const toastIcon = document.getElementById('toast-icon');
+            
+            toastMsg.textContent = message;
+            if (isError) {
+                toastIcon.innerHTML = `<i data-lucide="x-circle" class="w-5 h-5 text-rose-500"></i>`;
+            } else {
+                toastIcon.innerHTML = `<i data-lucide="check-circle" class="w-5 h-5 text-emerald-400"></i>`;
+            }
+            lucide.createIcons();
+
+            toast.classList.remove('translate-y-20', 'opacity-0');
+            toast.classList.add('translate-y-0', 'opacity-100');
+
+            setTimeout(() => {
+                toast.classList.remove('translate-y-0', 'opacity-100');
+                toast.classList.add('translate-y-20', 'opacity-0');
+            }, 3000);
+        }
+
+        // Main view toggling (Survey Flow vs Admin Panel)
+        function switchMode(mode) {
+            const surveySec = document.getElementById('section-survey');
+            const adminSec = document.getElementById('section-admin');
+            const thanksSec = document.getElementById('section-thanks');
+            
+            const tabSurvey = document.getElementById('tab-survey');
+            const tabAdmin = document.getElementById('tab-admin');
+
+            // Reset tab styling
+            tabSurvey.className = "px-4 py-2 text-sm font-medium rounded-lg transition duration-200 flex items-center space-x-2 text-slate-600 hover:text-slate-800";
+            tabAdmin.className = "px-4 py-2 text-sm font-medium rounded-lg transition duration-200 flex items-center space-x-2 text-slate-600 hover:text-slate-800";
+
+            if (mode === 'survey') {
+                surveySec.classList.remove('hidden');
+                adminSec.classList.add('hidden');
+                thanksSec.classList.add('hidden');
+                tabSurvey.classList.add('bg-white', 'text-slate-800', 'shadow-sm');
+                initSurvey();
+            } else if (mode === 'admin') {
+                surveySec.classList.add('hidden');
+                thanksSec.classList.add('hidden');
+                adminSec.classList.remove('hidden');
+                tabAdmin.classList.add('bg-white', 'text-slate-800', 'shadow-sm');
+                renderAdminPanel();
+            }
+        }
+
+        // Admin subtabs toggling (Analytics vs Concept configuration)
+        function switchAdminTab(subtab) {
+            const resultsPanel = document.getElementById('admin-results-panel');
+            const editorPanel = document.getElementById('admin-editor-panel');
+            const tabResultsBtn = document.getElementById('admin-subtab-results');
+            const tabEditorBtn = document.getElementById('admin-subtab-editor');
+
+            // Default class resets
+            tabResultsBtn.className = "text-sm font-medium text-slate-500 hover:text-slate-800 pb-4 -mb-4";
+            tabEditorBtn.className = "text-sm font-medium text-slate-500 hover:text-slate-800 pb-4 -mb-4";
+
+            if (subtab === 'results') {
+                resultsPanel.classList.remove('hidden');
+                editorPanel.classList.add('hidden');
+                tabResultsBtn.className = "text-sm font-semibold text-indigo-600 border-b-2 border-indigo-600 pb-4 -mb-4";
+                renderCharts();
+            } else {
+                resultsPanel.classList.add('hidden');
+                editorPanel.classList.remove('hidden');
+                tabEditorBtn.className = "text-sm font-semibold text-indigo-600 border-b-2 border-indigo-600 pb-4 -mb-4";
+                renderEditorForm();
+            }
+        }
+
+        // Build the current step in the survey mode
+        function initSurvey() {
+            if (appState.concepts.length === 0) {
+                document.getElementById('survey-concept-title').textContent = "Концептів не знайдено";
+                document.getElementById('survey-concept-desc').textContent = "Будь ласка, додайте їх у Панелі керування.";
+                return;
+            }
+
+            const currentConcept = appState.concepts[currentStep];
+            
+            // Text values update
+            document.getElementById('survey-concept-title').textContent = currentConcept.name;
+            document.getElementById('survey-concept-desc').textContent = currentConcept.desc || "Перегляньте деталі та оцініть.";
+            document.getElementById('survey-progress-text').textContent = `${currentStep + 1} з ${appState.concepts.length}`;
+            
+            // Progress Bar update
+            const progressPct = ((currentStep + 1) / appState.concepts.length) * 100;
+            document.getElementById('survey-progress-bar').style.width = `${progressPct}%`;
+
+            // Display images smoothly with desktop-grid and mobile-snap scroll
+            const imagesContainer = document.getElementById('survey-images-container');
+            imagesContainer.innerHTML = '';
+            currentConcept.images.forEach((imgUrl, index) => {
+                const imgDiv = document.createElement('div');
+                imgDiv.className = "snap-center shrink-0 w-[85vw] md:w-auto h-64 md:h-72 rounded-2xl overflow-hidden shadow-md border border-slate-200 relative group transition-all duration-300 hover:shadow-xl";
+                imgDiv.innerHTML = `
+                    <img src="${imgUrl}" alt="Кут ${index + 1}" class="w-full h-full object-cover transition-all duration-500 group-hover:scale-105" onerror="this.src='https://placehold.co/600x400/eceff1/37474f?text=Немає+картинки'">
+                    <div class="absolute top-3 left-3 bg-slate-900/70 text-white backdrop-blur-md px-3 py-1 rounded-full text-xs font-semibold">
+                        Ракурс ${index + 1}
+                    </div>
+                `;
+                imagesContainer.appendChild(imgDiv);
+            });
+
+            // Re-set or clear rating status
+            currentRating = 0;
+            resetStars();
+            document.getElementById('survey-comment').value = '';
+
+            // Update footer navigations
+            const prevBtn = document.getElementById('btn-prev');
+            prevBtn.disabled = currentStep === 0;
+
+            const nextBtnText = document.getElementById('btn-next-text');
+            if (currentStep === appState.concepts.length - 1) {
+                nextBtnText.textContent = "Надіслати всі оцінки";
+            } else {
+                nextBtnText.textContent = "Наступний концепт";
+            }
+        }
+
+        // Star interaction hover-states
+        function hoverStars(rating) {
+            const stars = document.querySelectorAll('.star-btn i');
+            stars.forEach((star, index) => {
+                if (index < rating) {
+                    star.classList.add('text-amber-400', 'fill-amber-400');
+                    star.classList.remove('text-slate-300', 'fill-transparent');
+                } else {
+                    star.classList.remove('text-amber-400', 'fill-amber-400');
+                    star.classList.add('text-slate-300', 'fill-transparent');
+                }
+            });
+            document.getElementById('rating-description').textContent = STAR_LABELS[rating] || "";
+        }
+
+        function resetStars() {
+            hoverStars(currentRating);
+            if (currentRating === 0) {
+                document.getElementById('rating-description').innerHTML = "&nbsp;";
+            }
+        }
+
+        function setRating(rating) {
+            currentRating = rating;
+            hoverStars(rating);
+        }
+
+        // Next and Prev steps management
+        function prevStep() {
+            if (currentStep > 0) {
+                currentStep--;
+                initSurvey();
+            }
+        }
+
+        // Submitting current rating step and advancing
+        function submitAndNext() {
+            if (currentRating === 0) {
+                showToast("Будь ласка, виберіть хоча б одну зірочку для оцінки!", true);
+                return;
+            }
+
+            // Save the single vote to local session votes queue
+            const conceptId = appState.concepts[currentStep].id;
+            const conceptName = appState.concepts[currentStep].name;
+            const comment = document.getElementById('survey-comment').value.trim();
+            
+            appState.votes.push({
+                conceptId: conceptId,
+                conceptName: conceptName,
+                score: currentRating,
+                comment: comment,
+                timestamp: new Date().toISOString()
+            });
+
+            // Check if this was the last concept slide
+            if (currentStep < appState.concepts.length - 1) {
+                currentStep++;
+                initSurvey();
+            } else {
+                // Save session votes directly into database
+                localStorage.setItem('cr_votes', JSON.stringify(appState.votes));
+                showToast("Голоси збережено! Дякуємо.");
+                
+                // Switch to Thank You block
+                document.getElementById('section-survey').classList.add('hidden');
+                document.getElementById('section-thanks').classList.remove('hidden');
+            }
+        }
+
+        function restartSurvey() {
+            currentStep = 0;
+            currentRating = 0;
+            // Clean local active votes to allow a clean vote re-evaluation
+            switchMode('survey');
+        }
+
+        // Admin Statistics Calculation & Dashboard charts rendering
+        function renderAdminPanel() {
+            const votes = appState.votes;
+            const concepts = appState.concepts;
+
+            // Total votes calculation (unique sets of evaluations or total lines)
+            document.getElementById('stat-total-votes').textContent = votes.length;
+
+            // Best Concept Logic (Highest Average Rating)
+            let bestConceptName = "—";
+            let maxAvg = 0;
+
+            if (votes.length > 0) {
+                concepts.forEach(concept => {
+                    const conceptVotes = votes.filter(v => v.conceptId === concept.id);
+                    if (conceptVotes.length > 0) {
+                        const sum = conceptVotes.reduce((acc, v) => acc + v.score, 0);
+                        const avg = sum / conceptVotes.length;
+                        if (avg > maxAvg) {
+                            maxAvg = avg;
+                            bestConceptName = `${concept.name} (${avg.toFixed(1)}★)`;
+                        }
+                    }
+                });
+            }
+            document.getElementById('stat-best-concept').textContent = bestConceptName;
+
+            // Load feedback comments list
+            const logsContainer = document.getElementById('feedback-logs');
+            logsContainer.innerHTML = '';
+            
+            const commentsWithText = votes.filter(v => v.comment && v.comment.length > 0).reverse();
+            if (commentsWithText.length === 0) {
+                logsContainer.innerHTML = `<div class="text-slate-400 text-sm py-4 text-center">Коментарі ще не надходили.</div>`;
+            } else {
+                commentsWithText.forEach(vote => {
+                    const starsHTML = Array.from({length: 5}, (_, i) => 
+                        `<i data-lucide="star" class="w-3.5 h-3.5 ${i < vote.score ? 'text-amber-400 fill-amber-400' : 'text-slate-200'} inline"></i>`
+                    ).join('');
+
+                    const logCard = document.createElement('div');
+                    logCard.className = "bg-slate-50 border border-slate-100 p-4 rounded-xl space-y-2";
+                    logCard.innerHTML = `
+                        <div class="flex items-center justify-between text-xs text-slate-500">
+                            <span class="font-semibold text-slate-700">${vote.conceptName}</span>
+                            <span>${starsHTML}</span>
+                        </div>
+                        <p class="text-sm text-slate-600 italic">"${vote.comment}"</p>
+                    `;
+                    logsContainer.appendChild(logCard);
+                });
+                lucide.createIcons();
+            }
+
+            renderCharts();
+        }
+
+        // Constructing Chart.js bars and pies
+        function renderCharts() {
+            const ctxAvg = document.getElementById('chart-average');
+            const ctxStars = document.getElementById('chart-stars-breakdown');
+
+            if (!ctxAvg || !ctxStars) return;
+
+            // Destroy existing chart instances to re-render cleanly
+            if (chartInstances.avg) chartInstances.avg.destroy();
+            if (chartInstances.stars) chartInstances.stars.destroy();
+
+            const concepts = appState.concepts;
+            const votes = appState.votes;
+
+            // Average score calculations per design concept
+            const labels = concepts.map(c => c.name.split(':')[0] || c.name); // Clean names slightly
+            const averageScores = concepts.map(concept => {
+                const cVotes = votes.filter(v => v.conceptId === concept.id);
+                if (cVotes.length === 0) return 0;
+                const sum = cVotes.reduce((acc, v) => acc + v.score, 0);
+                return Number((sum / cVotes.length).toFixed(2));
+            });
+
+            // 1. Average rating bar chart
+            chartInstances.avg = new Chart(ctxAvg, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Середня оцінка (зірки 1-5)',
+                        data: averageScores,
+                        backgroundColor: 'rgba(79, 70, 229, 0.85)',
+                        borderColor: 'rgb(79, 70, 229)',
+                        borderWidth: 1.5,
+                        borderRadius: 8,
+                        barThickness: 40
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            max: 5,
+                            grid: { color: '#f1f5f9' },
+                            ticks: { font: { family: 'Inter' } }
+                        },
+                        x: {
+                            grid: { display: false },
+                            ticks: { font: { family: 'Inter' } }
+                        }
+                    },
+                    plugins: {
+                        legend: { display: false }
+                    }
+                }
+            });
+
+            // 2. Stars distribution pie breakdown
+            const starDistribution = [0, 0, 0, 0, 0]; // representing 1, 2, 3, 4, 5 stars
+            votes.forEach(v => {
+                if (v.score >= 1 && v.score <= 5) {
+                    starDistribution[v.score - 1]++;
+                }
+            });
+
+            chartInstances.stars = new Chart(ctxStars, {
+                type: 'doughnut',
+                data: {
+                    labels: ['1 ★', '2 ★', '3 ★', '4 ★', '5 ★'],
+                    datasets: [{
+                        data: starDistribution,
+                        backgroundColor: [
+                            'rgba(244, 63, 94, 0.85)',   // 1 Rose
+                            'rgba(249, 115, 22, 0.85)',  // 2 Orange
+                            'rgba(234, 179, 8, 0.85)',   // 3 Yellow
+                            'rgba(14, 165, 233, 0.85)',  // 4 Light blue
+                            'rgba(16, 185, 129, 0.85)'   // 5 Emerald
+                        ],
+                        borderWidth: 2,
+                        hoverOffset: 4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'right',
+                            labels: {
+                                boxWidth: 12,
+                                font: { family: 'Inter', size: 12 }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        // Build the dynamic editing forms for custom user images and concepts configuration
+        function renderEditorForm() {
+            const listContainer = document.getElementById('editor-concepts-list');
+            listContainer.innerHTML = '';
+
+            appState.concepts.forEach((concept, index) => {
+                const card = document.createElement('div');
+                card.className = "bg-white border border-slate-200 p-6 rounded-2xl shadow-sm space-y-4";
+                card.innerHTML = `
+                    <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+                        <span class="text-sm font-bold text-slate-800">Концепт №${index + 1}</span>
+                    </div>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="text-xs font-semibold text-slate-500 uppercase block mb-1">Назва концепту:</label>
+                            <input type="text" id="edit-name-${index}" value="${concept.name}" class="w-full text-sm px-3 py-2 border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500">
+                        </div>
+                        <div>
+                            <label class="text-xs font-semibold text-slate-500 uppercase block mb-1">Опис концепту:</label>
+                            <input type="text" id="edit-desc-${index}" value="${concept.desc || ''}" class="w-full text-sm px-3 py-2 border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500">
+                        </div>
+                    </div>
+
+                    <div class="space-y-2">
+                        <span class="text-xs font-semibold text-slate-500 uppercase block">3 посилання на фотографії (URL):</span>
+                        <div class="grid grid-cols-1 gap-2">
+                            <input type="text" id="edit-img-${index}-0" value="${concept.images[0] || ''}" placeholder="URL ракурсу 1" class="w-full text-xs px-3 py-2 border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500">
+                            <input type="text" id="edit-img-${index}-1" value="${concept.images[1] || ''}" placeholder="URL ракурсу 2" class="w-full text-xs px-3 py-2 border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500">
+                            <input type="text" id="edit-img-${index}-2" value="${concept.images[2] || ''}" placeholder="URL ракурсу 3" class="w-full text-xs px-3 py-2 border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500">
+                        </div>
+                    </div>
+                `;
+                listContainer.appendChild(card);
+            });
+        }
+
+        // Save customized images and names back into Database
+        function saveConceptsFromEditor() {
+            const updatedConcepts = appState.concepts.map((concept, index) => {
+                return {
+                    id: concept.id,
+                    name: document.getElementById(`edit-name-${index}`).value.trim() || `Концепт ${index + 1}`,
+                    desc: document.getElementById(`edit-desc-${index}`).value.trim(),
+                    images: [
+                        document.getElementById(`edit-img-${index}-0`).value.trim(),
+                        document.getElementById(`edit-img-${index}-1`).value.trim(),
+                        document.getElementById(`edit-img-${index}-2`).value.trim()
+                    ]
+                };
+            });
+
+            appState.concepts = updatedConcepts;
+            localStorage.setItem('cr_concepts', JSON.stringify(updatedConcepts));
+            
+            showToast("Концепти успішно оновлено!");
+            switchAdminTab('results');
+        }
+
+        function restoreDefaultConcepts() {
+            appState.concepts = [...DEFAULT_CONCEPTS];
+            localStorage.setItem('cr_concepts', JSON.stringify(DEFAULT_CONCEPTS));
+            showToast("Відновлено дефолтні концепти");
+            renderEditorForm();
+        }
+
+        // Prompt user inside UI instead of standard confirm dialog
+        function resetAllVotesPrompt() {
+            const userConfirms = confirm("Ви впевнені, що хочете видалити всі збережені голоси? Цю дію неможливо скасувати.");
+            if (userConfirms) {
+                appState.votes = [];
+                localStorage.removeItem('cr_votes');
+                showToast("Голоси успішно обнулено!");
+                renderAdminPanel();
+            }
+        }
+
+        // Free client-side CSV file compilation and trigger direct download
+        function exportToCSV() {
+            if (appState.votes.length === 0) {
+                showToast("Немає голосів для експорту!", true);
+                return;
+            }
+
+            let csvContent = "data:text/csv;charset=utf-8,";
+            csvContent += "Concept ID,Concept Name,Score,Comment,Timestamp\n";
+
+            appState.votes.forEach(vote => {
+                // Ensure proper escaping for strings that might have commas or quotes
+                const escapedName = `"${vote.conceptName.replace(/"/g, '""')}"`;
+                const escapedComment = `"${(vote.comment || '').replace(/"/g, '""')}"`;
+                csvContent += `${vote.conceptId},${escapedName},${vote.score},${escapedComment},${vote.timestamp}\n`;
+            });
+
+            // Trigger click simulation to download file cleanly
+            const encodedUri = encodeURI(csvContent);
+            const link = document.createElement("a");
+            link.setAttribute("href", encodedUri);
+            link.setAttribute("download", `concept_votes_export_${new Date().toISOString().split('T')[0]}.csv`);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            showToast("Файл CSV успішно завантажено!");
+        }
+    </script>
+</body>
+</html>
