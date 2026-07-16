@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="uk">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -38,7 +38,7 @@
                 </div>
                 <div>
                     <h1 class="font-bold text-lg leading-tight">ConceptRater</h1>
-                    <p class="text-xs text-slate-500">Design Comparison and Evaluation</p>
+                    <p class="text-xs text-slate-500">Compare & Rate Designs</p>
                 </div>
             </div>
             
@@ -46,11 +46,11 @@
             <div class="flex space-x-1 bg-slate-100 p-1 rounded-xl">
                 <button id="tab-survey" onclick="switchMode('survey')" class="px-4 py-2 text-sm font-medium rounded-lg transition duration-200 flex items-center space-x-2 bg-white text-slate-800 shadow-sm">
                     <i data-lucide="clipboard-list" class="w-4 h-4 text-indigo-600"></i>
-                    <span>Опитування</span>
+                    <span>Survey</span>
                 </button>
                 <button id="tab-admin" onclick="switchMode('admin')" class="px-4 py-2 text-sm font-medium rounded-lg transition duration-200 flex items-center space-x-2 text-slate-600 hover:text-slate-800">
                     <i data-lucide="bar-chart-3" class="w-4 h-4"></i>
-                    <span>Панель керування</span>
+                    <span>Admin Panel</span>
                 </button>
             </div>
         </div>
@@ -65,19 +65,34 @@
             <span id="toast-message" class="text-sm font-medium">Saved successfully!</span>
         </div>
 
+        <!-- Custom confirmation modal replacing confirm() -->
+        <div id="confirm-modal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center hidden opacity-0 transition-opacity duration-200">
+            <div class="bg-white p-6 rounded-2xl max-w-sm w-full mx-4 shadow-2xl border border-slate-100 transform scale-95 transition-transform duration-200" id="confirm-modal-box">
+                <div class="w-12 h-12 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center mb-4">
+                    <i data-lucide="alert-triangle" class="w-6 h-6"></i>
+                </div>
+                <h3 class="text-lg font-bold text-slate-950 mb-2">Reset all votes?</h3>
+                <p class="text-sm text-slate-500 mb-6">Are you sure you want to delete all saved votes? This action cannot be undone.</p>
+                <div class="flex space-x-3 justify-end">
+                    <button onclick="closeConfirmModal(false)" class="px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-100 rounded-xl transition duration-150">Cancel</button>
+                    <button onclick="closeConfirmModal(true)" class="px-4 py-2 text-sm font-semibold text-white bg-rose-600 hover:bg-rose-700 rounded-xl shadow-lg shadow-rose-100 transition duration-150">Yes, delete</button>
+                </div>
+            </div>
+        </div>
+
         <!-- SECTION: SURVEY MODE -->
         <section id="section-survey" class="space-y-6">
             <!-- Header Progress -->
             <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
                     <span class="text-xs font-semibold text-indigo-600 uppercase tracking-wider">Concept Testing</span>
-                    <h2 id="survey-concept-title" class="text-2xl font-bold text-slate-800 mt-1">Назва концепту</h2>
-                    <p id="survey-concept-desc" class="text-sm text-slate-500 mt-1">Опис концепту...</p>
+                    <h2 id="survey-concept-title" class="text-2xl font-bold text-slate-800 mt-1">Concept Title</h2>
+                    <p id="survey-concept-desc" class="text-sm text-slate-500 mt-1">Concept description...</p>
                 </div>
                 <div class="flex items-center space-x-3 bg-slate-50 px-4 py-2 rounded-xl border border-slate-100 self-start md:self-auto">
                     <div class="text-right">
                         <span class="text-xs text-slate-400 block font-medium">Progress</span>
-                        <span id="survey-progress-text" class="text-sm font-bold text-slate-700">1 з 3</span>
+                        <span id="survey-progress-text" class="text-sm font-bold text-slate-700">1 of 3</span>
                     </div>
                     <div class="w-24 bg-slate-200 h-2 rounded-full overflow-hidden">
                         <div id="survey-progress-bar" class="bg-indigo-600 h-full transition-all duration-300" style="width: 33%"></div>
@@ -89,15 +104,14 @@
             <div class="space-y-2">
                 <div class="flex justify-between items-center px-1">
                     <span class="text-xs text-slate-400 font-semibold uppercase flex items-center gap-1">
-                        <i data-lucide="eye" class="w-3.5 h-3.5"></i> 3 Concept Views
+                        <i data-lucide="eye" class="w-3.5 h-3.5"></i> 3 Viewpoints of the Concept
                     </span>
                     <span class="text-xs text-slate-400 md:hidden flex items-center gap-1">
-                        Swipe <i data-lucide="arrow-right" class="w-3 h-3"></i>
+                        Swipe sideways <i data-lucide="arrow-right" class="w-3 h-3"></i>
                     </span>
                 </div>
                 
                 <!-- 3 Images Layout -->
-                <!-- Desktop: 3-column Grid | Mobile: Horizontal Scrollable Strip for best usability -->
                 <div id="survey-images-container" class="grid grid-cols-1 md:grid-cols-3 gap-4 overflow-x-auto md:overflow-x-visible snap-x snap-mandatory flex md:grid hide-scrollbar pb-2 md:pb-0">
                     <!-- Images dynamically rendered here -->
                 </div>
@@ -105,25 +119,35 @@
 
             <!-- Centralized Rating Block -->
             <div class="bg-white p-8 rounded-2xl border border-slate-200 shadow-sm text-center max-w-2xl mx-auto space-y-4">
-                <h3 class="text-lg font-semibold text-slate-800">How appealing is this to you?</h3>
-                <p class="text-xs text-slate-400 uppercase tracking-wide">Please rate from 1 to 5 stars.</p>
+                <h3 class="text-lg font-semibold text-slate-800">How would you rate this design concept?</h3>
+                <p class="text-xs text-slate-400 uppercase tracking-wide">Please select from 1 to 5 stars</p>
                 
                 <!-- Star Rating Interactive Block -->
                 <div class="flex justify-center items-center space-x-2 py-4">
                     <button onclick="setRating(1)" onmouseover="hoverStars(1)" onmouseleave="resetStars()" class="star-btn p-1 transition duration-150 transform hover:scale-110 focus:outline-none">
-                        <i data-lucide="star" class="w-10 h-10 text-slate-300 fill-transparent transition duration-200"></i>
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-10 h-10 text-slate-300 fill-transparent transition duration-200">
+                            <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+                        </svg>
                     </button>
                     <button onclick="setRating(2)" onmouseover="hoverStars(2)" onmouseleave="resetStars()" class="star-btn p-1 transition duration-150 transform hover:scale-110 focus:outline-none">
-                        <i data-lucide="star" class="w-10 h-10 text-slate-300 fill-transparent transition duration-200"></i>
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-10 h-10 text-slate-300 fill-transparent transition duration-200">
+                            <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+                        </svg>
                     </button>
                     <button onclick="setRating(3)" onmouseover="hoverStars(3)" onmouseleave="resetStars()" class="star-btn p-1 transition duration-150 transform hover:scale-110 focus:outline-none">
-                        <i data-lucide="star" class="w-10 h-10 text-slate-300 fill-transparent transition duration-200"></i>
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-10 h-10 text-slate-300 fill-transparent transition duration-200">
+                            <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+                        </svg>
                     </button>
                     <button onclick="setRating(4)" onmouseover="hoverStars(4)" onmouseleave="resetStars()" class="star-btn p-1 transition duration-150 transform hover:scale-110 focus:outline-none">
-                        <i data-lucide="star" class="w-10 h-10 text-slate-300 fill-transparent transition duration-200"></i>
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-10 h-10 text-slate-300 fill-transparent transition duration-200">
+                            <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+                        </svg>
                     </button>
                     <button onclick="setRating(5)" onmouseover="hoverStars(5)" onmouseleave="resetStars()" class="star-btn p-1 transition duration-150 transform hover:scale-110 focus:outline-none">
-                        <i data-lucide="star" class="w-10 h-10 text-slate-300 fill-transparent transition duration-200"></i>
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-10 h-10 text-slate-300 fill-transparent transition duration-200">
+                            <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+                        </svg>
                     </button>
                 </div>
 
@@ -134,8 +158,8 @@
 
                 <!-- Feedback Text Area (Optional comments) -->
                 <div class="pt-2 text-left">
-                    <label for="survey-comment" class="text-xs font-semibold text-slate-500 uppercase block mb-1">Коментар (необов'язково):</label>
-                    <textarea id="survey-comment" rows="2" placeholder="Що саме сподобалось або не сподобалось у цьому концепті..." class="w-full text-sm px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none resize-none transition duration-150"></textarea>
+                    <label for="survey-comment" class="text-xs font-semibold text-slate-500 uppercase block mb-1">Comment (optional):</label>
+                    <textarea id="survey-comment" rows="2" placeholder="What exactly did you like or dislike about this concept..." class="w-full text-sm px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none resize-none transition duration-150"></textarea>
                 </div>
 
                 <!-- Navigation Controls -->
@@ -146,7 +170,7 @@
                     </button>
                     
                     <button id="btn-next" onclick="submitAndNext()" class="px-6 py-2.5 text-sm font-semibold bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl shadow-lg shadow-indigo-100 transition duration-150 flex items-center space-x-1.5 disabled:opacity-50 disabled:pointer-events-none">
-                        <span id="btn-next-text">Наступний концепт</span>
+                        <span id="btn-next-text">Next Concept</span>
                         <i data-lucide="arrow-right" class="w-4 h-4"></i>
                     </button>
                 </div>
@@ -159,8 +183,8 @@
                 <i data-lucide="party-popper" class="w-10 h-10"></i>
             </div>
             <div class="space-y-2">
-                <h2 class="text-3xl font-extrabold text-slate-800">Дякуємо за оцінку!</h2>
-                <p class="text-slate-500">Your vote has been successfully recorded. Thank you for helping us choose the best design.</p>
+                <h2 class="text-3xl font-extrabold text-slate-800">Thank you for rating!</h2>
+                <p class="text-slate-500">Your feedback has been successfully recorded. You helped us choose the best design variant.</p>
             </div>
             <div class="pt-4 flex flex-col sm:flex-row gap-3 justify-center">
                 <button onclick="restartSurvey()" class="px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-xl transition shadow-lg shadow-indigo-100 flex items-center justify-center space-x-2">
@@ -169,7 +193,7 @@
                 </button>
                 <button onclick="switchMode('admin')" class="px-6 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-xl transition flex items-center justify-center space-x-2">
                     <i data-lucide="bar-chart-3" class="w-4 h-4"></i>
-                    <span>Results</span>
+                    <span>View Results</span>
                 </button>
             </div>
         </section>
@@ -184,7 +208,7 @@
                         <i data-lucide="users" class="w-6 h-6"></i>
                     </div>
                     <div>
-                        <span class="text-xs text-slate-400 block font-semibold uppercase tracking-wider">Всього оцінило осіб</span>
+                        <span class="text-xs text-slate-400 block font-semibold uppercase tracking-wider">Total Respondents</span>
                         <span id="stat-total-votes" class="text-2xl font-bold text-slate-800">0</span>
                     </div>
                 </div>
@@ -193,7 +217,7 @@
                         <i data-lucide="award" class="w-6 h-6"></i>
                     </div>
                     <div>
-                        <span class="text-xs text-slate-400 block font-semibold uppercase tracking-wider">Найкращий концепт</span>
+                        <span class="text-xs text-slate-400 block font-semibold uppercase tracking-wider">Best Concept</span>
                         <span id="stat-best-concept" class="text-2xl font-bold text-slate-800">—</span>
                     </div>
                 </div>
@@ -202,10 +226,10 @@
                         <i data-lucide="database" class="w-6 h-6"></i>
                     </div>
                     <div>
-                        <span class="text-xs text-slate-400 block font-semibold uppercase tracking-wider">Експорт інформації</span>
+                        <span class="text-xs text-slate-400 block font-semibold uppercase tracking-wider">Export Data</span>
                         <button onclick="exportToCSV()" class="mt-1 px-3 py-1.5 text-xs font-semibold bg-slate-900 hover:bg-slate-800 text-white rounded-lg transition duration-200 flex items-center space-x-1">
                             <i data-lucide="download" class="w-3.5 h-3.5"></i>
-                            <span>Завантажити CSV</span>
+                            <span>Download CSV</span>
                         </button>
                     </div>
                 </div>
@@ -215,12 +239,12 @@
             <div class="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
                 <div class="border-b border-slate-200 bg-slate-50/50 px-6 py-4 flex items-center justify-between flex-wrap gap-4">
                     <div class="flex space-x-4">
-                        <button id="admin-subtab-results" onclick="switchAdminTab('results')" class="text-sm font-semibold text-indigo-600 border-b-2 border-indigo-600 pb-4 -mb-4">Аналітика голосів</button>
-                        <button id="admin-subtab-editor" onclick="switchAdminTab('editor')" class="text-sm font-medium text-slate-500 hover:text-slate-800 pb-4 -mb-4">Редактор концептів</button>
+                        <button id="admin-subtab-results" onclick="switchAdminTab('results')" class="text-sm font-semibold text-indigo-600 border-b-2 border-indigo-600 pb-4 -mb-4">Vote Analytics</button>
+                        <button id="admin-subtab-editor" onclick="switchAdminTab('editor')" class="text-sm font-medium text-slate-500 hover:text-slate-800 pb-4 -mb-4">Concept Editor</button>
                     </div>
                     <button onclick="resetAllVotesPrompt()" class="text-xs font-semibold text-rose-600 hover:text-rose-700 flex items-center space-x-1">
                         <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
-                        <span>Скинути всі голоси</span>
+                        <span>Reset All Votes</span>
                     </button>
                 </div>
 
@@ -231,7 +255,7 @@
                             <!-- Left: Score Bar Chart -->
                             <div class="space-y-4">
                                 <h3 class="text-base font-bold text-slate-800 flex items-center gap-1.5">
-                                    <i data-lucide="trending-up" class="w-4 h-4 text-indigo-600"></i> Середній бал кожного концепту
+                                    <i data-lucide="trending-up" class="w-4 h-4 text-indigo-600"></i> Average Score per Concept
                                 </h3>
                                 <div class="h-64 flex items-center justify-center border border-slate-100 rounded-xl p-4 bg-slate-50/30">
                                     <canvas id="chart-average"></canvas>
@@ -240,7 +264,7 @@
                             <!-- Right: Detailed Star breakdown -->
                             <div class="space-y-4">
                                 <h3 class="text-base font-bold text-slate-800 flex items-center gap-1.5">
-                                    <i data-lucide="pie-chart" class="w-4 h-4 text-indigo-600"></i> Загальний розподіл оцінок
+                                    <i data-lucide="pie-chart" class="w-4 h-4 text-indigo-600"></i> Overall Star Distribution
                                 </h3>
                                 <div class="h-64 flex items-center justify-center border border-slate-100 rounded-xl p-4 bg-slate-50/30">
                                     <canvas id="chart-stars-breakdown"></canvas>
@@ -251,7 +275,7 @@
                         <!-- Real-time feedback logs -->
                         <div class="space-y-3">
                             <h3 class="text-base font-bold text-slate-800 flex items-center gap-1.5">
-                                <i data-lucide="message-square" class="w-4 h-4 text-indigo-600"></i> Останні коментарі та відгуки
+                                <i data-lucide="message-square" class="w-4 h-4 text-indigo-600"></i> Recent Comments & Feedback
                             </h3>
                             <div id="feedback-logs" class="space-y-3 max-h-60 overflow-y-auto pr-2">
                                 <!-- Comment blocks populated here -->
@@ -264,8 +288,8 @@
                         <div class="bg-indigo-50 border border-indigo-100 p-4 rounded-xl flex gap-3">
                             <i data-lucide="info" class="w-5 h-5 text-indigo-600 shrink-0 mt-0.5"></i>
                             <p class="text-xs text-indigo-800 leading-relaxed">
-                                Тут ви можете вказати власні назви концептів та посилання на картинки (наприклад, з Unsplash, Pinterest або вашого хостингу). 
-                                Кожен концепт обов'язково повинен мати рівно 3 посилання на зображення.
+                                Here you can specify custom concept names and image links (e.g., from Unsplash, Pinterest, or your own hosting). 
+                                Each concept must have exactly 3 image URLs.
                             </p>
                         </div>
 
@@ -276,11 +300,11 @@
 
                         <div class="pt-4 border-t border-slate-100 flex justify-end space-x-3">
                             <button onclick="restoreDefaultConcepts()" class="px-5 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-100 rounded-xl transition duration-150">
-                                Відновити стандартні
+                                Restore Defaults
                             </button>
                             <button onclick="saveConceptsFromEditor()" class="px-6 py-2.5 text-sm font-semibold bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl shadow-lg shadow-indigo-100 transition duration-150 flex items-center space-x-1.5">
                                 <i data-lucide="save" class="w-4 h-4"></i>
-                                <span>Зберегти зміни</span>
+                                <span>Save Changes</span>
                             </button>
                         </div>
                     </div>
@@ -292,7 +316,7 @@
     <!-- Footer -->
     <footer class="bg-white border-t border-slate-200 py-6 text-center text-xs text-slate-400">
         <div class="max-w-6xl mx-auto px-4">
-            <p>© 2026 ConceptRater Inc. Усі права захищено. Безкоштовний автономний клієнт опитування.</p>
+            <p>© 2026 ConceptRater Inc. All rights reserved. Free standalone survey client.</p>
         </div>
     </footer>
 
@@ -301,18 +325,18 @@
         const DEFAULT_CONCEPTS = [
             {
                 id: "concept-1",
-                name: "THE HEART OF AMSTERDAM",
-                desc: "Світлі кольори, натуральне дерево, великі вікна та максимум затишку у вітальні.",
+                name: "Concept A: Scandinavian Minimalism",
+                desc: "Bright colors, natural wood, large windows, and maximum comfort in the living room.",
                 images: [
-                    "Images/Amsterdam%201.1.png",
-                    "Images/box.png",
-                    "Images/concept.png"
+                    "https://images.unsplash.com/photo-1598928506311-c55ded91a20c?auto=format&fit=crop&w=600&q=80",
+                    "https://images.unsplash.com/photo-1586023492125-27b2c045efd7?auto=format&fit=crop&w=600&q=80",
+                    "https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?auto=format&fit=crop&w=600&q=80"
                 ]
             },
             {
                 id: "concept-2",
-                name: "Концепт Б: Сучасний індастріал лофт",
-                desc: "Груба цегла, темний метал, відкриті комунікації та шкіряні акценти для сучасних квартир.",
+                name: "Concept B: Modern Industrial Loft",
+                desc: "Exposed brick, dark metal, visible utilities, and leather accents for modern apartments.",
                 images: [
                     "https://images.unsplash.com/photo-1600210492486-724fe5c67fb0?auto=format&fit=crop&w=600&q=80",
                     "https://images.unsplash.com/photo-1600121848594-d8644e57abab?auto=format&fit=crop&w=600&q=80",
@@ -321,8 +345,8 @@
             },
             {
                 id: "concept-3",
-                name: "Концепт В: Неокласичний шик",
-                desc: "Витончена ліпнина, мармур, золоті деталі та розкішна геометрія меблів.",
+                name: "Concept C: Neoclassical Chic",
+                desc: "Elegant moldings, marble, gold details, and luxurious furniture geometry.",
                 images: [
                     "https://images.unsplash.com/photo-1513694203232-719a280e022f?auto=format&fit=crop&w=600&q=80",
                     "https://images.unsplash.com/photo-1484101403633-562f891dc89a?auto=format&fit=crop&w=600&q=80",
@@ -344,11 +368,11 @@
 
         // STAR DESCRIPTIONS TO MATCH EMOTIONS
         const STAR_LABELS = {
-            1: "Взагалі не подобається 😐",
-            2: "Має право на життя 🤨",
-            3: "Непогано, але не супер 🙂",
-            4: "Дуже гарний дизайн! 😍",
-            5: "Це шедевр, хочу собі! 🚀"
+            1: "Don't like it at all 😐",
+            2: "Could be better 🤨",
+            3: "Not bad, but not great 🙂",
+            4: "Very nice design! 😍",
+            5: "Love it, want this! 🚀"
         };
 
         window.onload = function() {
@@ -378,6 +402,35 @@
                 toast.classList.remove('translate-y-0', 'opacity-100');
                 toast.classList.add('translate-y-20', 'opacity-0');
             }, 3000);
+        }
+
+        // Custom Confirmation dialog managers (replacing browser-level blocking confirm())
+        let onConfirmCallback = null;
+        function showConfirmModal(callback) {
+            onConfirmCallback = callback;
+            const modal = document.getElementById('confirm-modal');
+            const box = document.getElementById('confirm-modal-box');
+            modal.classList.remove('hidden');
+            setTimeout(() => {
+                modal.classList.remove('opacity-0');
+                box.classList.remove('scale-95');
+                box.classList.add('scale-100');
+            }, 10);
+        }
+
+        function closeConfirmModal(accepted) {
+            const modal = document.getElementById('confirm-modal');
+            const box = document.getElementById('confirm-modal-box');
+            modal.classList.add('opacity-0');
+            box.classList.remove('scale-100');
+            box.classList.add('scale-95');
+            setTimeout(() => {
+                modal.classList.add('hidden');
+                if (accepted && onConfirmCallback) {
+                    onConfirmCallback();
+                }
+                onConfirmCallback = null;
+            }, 200);
         }
 
         // Main view toggling (Survey Flow vs Admin Panel)
@@ -435,8 +488,8 @@
         // Build the current step in the survey mode
         function initSurvey() {
             if (appState.concepts.length === 0) {
-                document.getElementById('survey-concept-title').textContent = "Концептів не знайдено";
-                document.getElementById('survey-concept-desc').textContent = "Будь ласка, додайте їх у Панелі керування.";
+                document.getElementById('survey-concept-title').textContent = "No Concepts Found";
+                document.getElementById('survey-concept-desc').textContent = "Please configure concepts in the Admin Panel.";
                 return;
             }
 
@@ -444,8 +497,8 @@
             
             // Text values update
             document.getElementById('survey-concept-title').textContent = currentConcept.name;
-            document.getElementById('survey-concept-desc').textContent = currentConcept.desc || "Перегляньте деталі та оцініть.";
-            document.getElementById('survey-progress-text').textContent = `${currentStep + 1} з ${appState.concepts.length}`;
+            document.getElementById('survey-concept-desc').textContent = currentConcept.desc || "Review the details and leave a rating.";
+            document.getElementById('survey-progress-text').textContent = `${currentStep + 1} of ${appState.concepts.length}`;
             
             // Progress Bar update
             const progressPct = ((currentStep + 1) / appState.concepts.length) * 100;
@@ -454,13 +507,14 @@
             // Display images smoothly with desktop-grid and mobile-snap scroll
             const imagesContainer = document.getElementById('survey-images-container');
             imagesContainer.innerHTML = '';
+
             currentConcept.images.forEach((imgUrl, index) => {
                 const imgDiv = document.createElement('div');
                 imgDiv.className = "snap-center shrink-0 w-[85vw] md:w-auto h-64 md:h-72 rounded-2xl overflow-hidden shadow-md border border-slate-200 relative group transition-all duration-300 hover:shadow-xl";
                 imgDiv.innerHTML = `
-                    <img src="${imgUrl}" alt="Кут ${index + 1}" class="w-full h-full object-cover transition-all duration-500 group-hover:scale-105" onerror="this.src='https://placehold.co/600x400/eceff1/37474f?text=Немає+картинки'">
+                    <img src="${imgUrl}" alt="Angle ${index + 1}" class="w-full h-full object-cover transition-all duration-500 group-hover:scale-105" onerror="this.src='https://placehold.co/600x400/eceff1/37474f?text=No+Image'">
                     <div class="absolute top-3 left-3 bg-slate-900/70 text-white backdrop-blur-md px-3 py-1 rounded-full text-xs font-semibold">
-                        Ракурс ${index + 1}
+                        Viewpoint ${index + 1}
                     </div>
                 `;
                 imagesContainer.appendChild(imgDiv);
@@ -477,15 +531,15 @@
 
             const nextBtnText = document.getElementById('btn-next-text');
             if (currentStep === appState.concepts.length - 1) {
-                nextBtnText.textContent = "Надіслати всі оцінки";
+                nextBtnText.textContent = "Submit All Ratings";
             } else {
-                nextBtnText.textContent = "Наступний концепт";
+                nextBtnText.textContent = "Next Concept";
             }
         }
 
         // Star interaction hover-states
         function hoverStars(rating) {
-            const stars = document.querySelectorAll('.star-btn i');
+            const stars = document.querySelectorAll('.star-btn svg');
             stars.forEach((star, index) => {
                 if (index < rating) {
                     star.classList.add('text-amber-400', 'fill-amber-400');
@@ -521,7 +575,7 @@
         // Submitting current rating step and advancing
         function submitAndNext() {
             if (currentRating === 0) {
-                showToast("Будь ласка, виберіть хоча б одну зірочку для оцінки!", true);
+                showToast("Please select at least one star to rate!", true);
                 return;
             }
 
@@ -545,7 +599,7 @@
             } else {
                 // Save session votes directly into database
                 localStorage.setItem('cr_votes', JSON.stringify(appState.votes));
-                showToast("Голоси збережено! Дякуємо.");
+                showToast("Votes saved! Thank you.");
                 
                 // Switch to Thank You block
                 document.getElementById('section-survey').classList.add('hidden');
@@ -556,7 +610,7 @@
         function restartSurvey() {
             currentStep = 0;
             currentRating = 0;
-            // Clean local active votes to allow a clean vote re-evaluation
+            appState.votes = []; // Clear current active voting session
             switchMode('survey');
         }
 
@@ -580,7 +634,7 @@
                         const avg = sum / conceptVotes.length;
                         if (avg > maxAvg) {
                             maxAvg = avg;
-                            bestConceptName = `${concept.name} (${avg.toFixed(1)}★)`;
+                            bestConceptName = `${concept.name.split(':')[0]} (${avg.toFixed(1)}★)`;
                         }
                     }
                 });
@@ -593,12 +647,19 @@
             
             const commentsWithText = votes.filter(v => v.comment && v.comment.length > 0).reverse();
             if (commentsWithText.length === 0) {
-                logsContainer.innerHTML = `<div class="text-slate-400 text-sm py-4 text-center">Коментарі ще не надходили.</div>`;
+                logsContainer.innerHTML = `<div class="text-slate-400 text-sm py-4 text-center">No comments submitted yet.</div>`;
             } else {
                 commentsWithText.forEach(vote => {
-                    const starsHTML = Array.from({length: 5}, (_, i) => 
-                        `<i data-lucide="star" class="w-3.5 h-3.5 ${i < vote.score ? 'text-amber-400 fill-amber-400' : 'text-slate-200'} inline"></i>`
-                    ).join('');
+                    let starsHTML = '';
+                    for (let i = 0; i < 5; i++) {
+                        const isFilled = i < vote.score;
+                        const colorClass = isFilled ? 'text-amber-400 fill-amber-400' : 'text-slate-200 fill-transparent';
+                        starsHTML += `
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-3.5 h-3.5 ${colorClass} inline">
+                                <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+                            </svg>
+                        `;
+                    }
 
                     const logCard = document.createElement('div');
                     logCard.className = "bg-slate-50 border border-slate-100 p-4 rounded-xl space-y-2";
@@ -646,7 +707,7 @@
                 data: {
                     labels: labels,
                     datasets: [{
-                        label: 'Середня оцінка (зірки 1-5)',
+                        label: 'Average Score (1-5 stars)',
                         data: averageScores,
                         backgroundColor: 'rgba(79, 70, 229, 0.85)',
                         borderColor: 'rgb(79, 70, 229)',
@@ -727,26 +788,26 @@
                 card.className = "bg-white border border-slate-200 p-6 rounded-2xl shadow-sm space-y-4";
                 card.innerHTML = `
                     <div class="flex items-center justify-between border-b border-slate-100 pb-3">
-                        <span class="text-sm font-bold text-slate-800">Концепт №${index + 1}</span>
+                        <span class="text-sm font-bold text-slate-800">Concept #${index + 1}</span>
                     </div>
                     
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
-                            <label class="text-xs font-semibold text-slate-500 uppercase block mb-1">Назва концепту:</label>
+                            <label class="text-xs font-semibold text-slate-500 uppercase block mb-1">Concept Name:</label>
                             <input type="text" id="edit-name-${index}" value="${concept.name}" class="w-full text-sm px-3 py-2 border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500">
                         </div>
                         <div>
-                            <label class="text-xs font-semibold text-slate-500 uppercase block mb-1">Опис концепту:</label>
+                            <label class="text-xs font-semibold text-slate-500 uppercase block mb-1">Concept Description:</label>
                             <input type="text" id="edit-desc-${index}" value="${concept.desc || ''}" class="w-full text-sm px-3 py-2 border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500">
                         </div>
                     </div>
 
                     <div class="space-y-2">
-                        <span class="text-xs font-semibold text-slate-500 uppercase block">3 посилання на фотографії (URL):</span>
+                        <span class="text-xs font-semibold text-slate-500 uppercase block">3 Photo URLs:</span>
                         <div class="grid grid-cols-1 gap-2">
-                            <input type="text" id="edit-img-${index}-0" value="${concept.images[0] || ''}" placeholder="URL ракурсу 1" class="w-full text-xs px-3 py-2 border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500">
-                            <input type="text" id="edit-img-${index}-1" value="${concept.images[1] || ''}" placeholder="URL ракурсу 2" class="w-full text-xs px-3 py-2 border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500">
-                            <input type="text" id="edit-img-${index}-2" value="${concept.images[2] || ''}" placeholder="URL ракурсу 3" class="w-full text-xs px-3 py-2 border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500">
+                            <input type="text" id="edit-img-${index}-0" value="${concept.images[0] || ''}" placeholder="Viewpoint 1 URL" class="w-full text-xs px-3 py-2 border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500">
+                            <input type="text" id="edit-img-${index}-1" value="${concept.images[1] || ''}" placeholder="Viewpoint 2 URL" class="w-full text-xs px-3 py-2 border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500">
+                            <input type="text" id="edit-img-${index}-2" value="${concept.images[2] || ''}" placeholder="Viewpoint 3 URL" class="w-full text-xs px-3 py-2 border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500">
                         </div>
                     </div>
                 `;
@@ -759,7 +820,7 @@
             const updatedConcepts = appState.concepts.map((concept, index) => {
                 return {
                     id: concept.id,
-                    name: document.getElementById(`edit-name-${index}`).value.trim() || `Концепт ${index + 1}`,
+                    name: document.getElementById(`edit-name-${index}`).value.trim() || `Concept ${index + 1}`,
                     desc: document.getElementById(`edit-desc-${index}`).value.trim(),
                     images: [
                         document.getElementById(`edit-img-${index}-0`).value.trim(),
@@ -772,32 +833,31 @@
             appState.concepts = updatedConcepts;
             localStorage.setItem('cr_concepts', JSON.stringify(updatedConcepts));
             
-            showToast("Концепти успішно оновлено!");
+            showToast("Concepts updated successfully!");
             switchAdminTab('results');
         }
 
         function restoreDefaultConcepts() {
             appState.concepts = [...DEFAULT_CONCEPTS];
             localStorage.setItem('cr_concepts', JSON.stringify(DEFAULT_CONCEPTS));
-            showToast("Відновлено дефолтні концепти");
+            showToast("Restored default concepts");
             renderEditorForm();
         }
 
-        // Prompt user inside UI instead of standard confirm dialog
+        // Prompt user inside beautiful UI instead of native blocking confirm dialog
         function resetAllVotesPrompt() {
-            const userConfirms = confirm("Ви впевнені, що хочете видалити всі збережені голоси? Цю дію неможливо скасувати.");
-            if (userConfirms) {
+            showConfirmModal(() => {
                 appState.votes = [];
                 localStorage.removeItem('cr_votes');
-                showToast("Голоси успішно обнулено!");
+                showToast("Votes successfully reset!");
                 renderAdminPanel();
-            }
+            });
         }
 
         // Free client-side CSV file compilation and trigger direct download
         function exportToCSV() {
             if (appState.votes.length === 0) {
-                showToast("Немає голосів для експорту!", true);
+                showToast("No votes to export!", true);
                 return;
             }
 
@@ -819,7 +879,7 @@
             document.body.appendChild(link);
             link.click();
             document.body.removeChild(link);
-            showToast("Файл CSV успішно завантажено!");
+            showToast("CSV file downloaded successfully!");
         }
     </script>
 </body>
