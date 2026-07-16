@@ -37,7 +37,13 @@
                     <i data-lucide="layers" class="w-6 h-6"></i>
                 </div>
                 <div>
-                    <h1 class="font-bold text-lg leading-tight">ConceptRater</h1>
+                    <div class="flex items-center space-x-2">
+                        <h1 class="font-bold text-lg leading-tight">ConceptRater</h1>
+                        <span id="db-status-badge" class="px-2 py-0.5 text-[10px] font-semibold rounded-full bg-slate-100 text-slate-500 flex items-center space-x-1">
+                            <span class="w-1.5 h-1.5 rounded-full bg-slate-400 animate-pulse"></span>
+                            <span>Connecting...</span>
+                        </span>
+                    </div>
                     <p class="text-xs text-slate-500">Compare & Rate Designs</p>
                 </div>
             </div>
@@ -321,25 +327,35 @@
     </footer>
 
     <script type="module">
-        import {
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, setDoc, onSnapshot, collection, addDoc, getDocs, deleteDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-            saveVote,
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {
+            apiKey: "AIzaSyAt-fHfHeZsLm_FNz_x9HS4LfHtGKza2ME",
+            authDomain: "conceptrater.firebaseapp.com",
+            projectId: "conceptrater",
+            storageBucket: "conceptrater.firebasestorage.app",
+            messagingSenderId: "457190894975",
+            appId: "1:457190894975:web:9d2e7aaae982aee521be4a"
+        };
+        
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        const auth = getAuth(app);
+        let userId = null;
 
-            getVotes,
-
-            clearVotes
-
-        } from "./firebase.js";
         // Default high-quality mockup concepts to showcase immediately
         const DEFAULT_CONCEPTS = [
             {
                 id: "concept-1",
-                name: "Concept A: THE HEART OF AMSTERDAM",
-                desc: "",
+                name: "THE HEART OF AMSTERDAM",
+                desc: "Experience the timeless beauty of Amsterdam's canals, where every piece reveals a story worth remembering.",
                 images: [
                     "Images/Amsterdam 1.1.png",
                     "Images/box.png",
-                    "Images/concept.png"
+                    "Images/box.png"
                 ]
             },
             {
@@ -364,18 +380,18 @@
             }
         ];
 
-        // Simulated Database State using localStorage
+        // Centralized App State
         let appState = {
-            concepts: JSON.parse(localStorage.getItem('cr_concepts')) || DEFAULT_CONCEPTS,
-            votes: JSON.parse(localStorage.getItem('cr_votes')) || []
+            concepts: [],
+            votes: []
         };
 
-        // Current user survey flow state
-        let currentStep = 0; // Index of the concept currently being rated
-        let currentRating = 0; // Value from 1 to 5 stars selected
-        let chartInstances = {}; // Holding references to ChartJS charts to easily update them
+        let isLocalStorageMode = false;
+        let sessionVotes = []; // Holds votes before submitting to DB
+        let currentStep = 0;
+        let currentRating = 0;
+        let chartInstances = {};
 
-        // STAR DESCRIPTIONS TO MATCH EMOTIONS
         const STAR_LABELS = {
             1: "Don't like it at all 😐",
             2: "Could be better 🤨",
@@ -384,14 +400,128 @@
             5: "Love it, want this! 🚀"
         };
 
+        function switchToLocalStorageMode(reason) {
+            if (isLocalStorageMode) return;
+            isLocalStorageMode = true;
+            console.warn("Switching to Local Storage Mode due to:", reason);
+            
+            // Render non-intrusive local database status badge
+            const badge = document.getElementById('db-status-badge');
+            if (badge) {
+                badge.className = "px-2 py-0.5 text-[10px] font-semibold rounded-full bg-amber-50 text-amber-700 border border-amber-200/50 flex items-center space-x-1";
+                badge.innerHTML = `<span class="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse"></span><span>Local Mode</span>`;
+            }
+
+            // Load saved concepts configuration from localStorage or seed defaults
+            const localConcepts = localStorage.getItem(`conceptrater_concepts_${appId}`);
+            if (localConcepts) {
+                appState.concepts = JSON.parse(localConcepts);
+            } else {
+                appState.concepts = DEFAULT_CONCEPTS;
+                localStorage.setItem(`conceptrater_concepts_${appId}`, JSON.stringify(DEFAULT_CONCEPTS));
+            }
+
+            // Load saved votes from localStorage
+            const localVotes = localStorage.getItem(`conceptrater_votes_${appId}`);
+            appState.votes = localVotes ? JSON.parse(localVotes) : [];
+
+            // Trigger safe interface redraws
+            if (!document.getElementById('section-survey').classList.contains('hidden')) {
+                window.initSurvey();
+            }
+            if (!document.getElementById('section-admin').classList.contains('hidden')) {
+                if (!document.getElementById('admin-editor-panel').classList.contains('hidden')) {
+                    window.renderEditorForm();
+                }
+                if (!document.getElementById('admin-results-panel').classList.contains('hidden')) {
+                    window.renderAdminPanel();
+                }
+            }
+        }
+
+        function setCloudActiveBadge() {
+            if (isLocalStorageMode) return;
+            const badge = document.getElementById('db-status-badge');
+            if (badge) {
+                badge.className = "px-2 py-0.5 text-[10px] font-semibold rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200/50 flex items-center space-x-1";
+                badge.innerHTML = `<span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span><span>Cloud Active</span>`;
+            }
+        }
+
+        async function initializeAppWithAuth() {
+            try {
+                if (typeof __initial_auth_token !== 'undefined') {
+                    await signInWithCustomToken(auth, __initial_auth_token);
+                } else {
+                    await signInAnonymously(auth);
+                }
+                userId = auth.currentUser.uid;
+                setupRealtimeListeners();
+            } catch (error) {
+                console.error("Auth error:", error);
+                switchToLocalStorageMode(error);
+            }
+        }
+
+        function setupRealtimeListeners() {
+            if (!userId) return;
+
+            // Listen to Concepts Config (Public Data)
+            const configRef = doc(db, 'artifacts', appId, 'public', 'config');
+            onSnapshot(configRef, (snapshot) => {
+                if (isLocalStorageMode) return;
+                if (snapshot.exists()) {
+                    appState.concepts = snapshot.data().concepts || [];
+                } else {
+                    // Seed defaults if no config exists
+                    setDoc(configRef, { concepts: DEFAULT_CONCEPTS });
+                    appState.concepts = DEFAULT_CONCEPTS;
+                }
+                
+                setCloudActiveBadge();
+
+                // Trigger re-renders based on current view
+                if (!document.getElementById('section-survey').classList.contains('hidden') && currentStep === 0) {
+                    window.initSurvey();
+                }
+                if (!document.getElementById('section-admin').classList.contains('hidden') && !document.getElementById('admin-editor-panel').classList.contains('hidden')) {
+                    window.renderEditorForm();
+                }
+                if (!document.getElementById('section-admin').classList.contains('hidden') && !document.getElementById('admin-results-panel').classList.contains('hidden')) {
+                    window.renderAdminPanel();
+                }
+            }, (error) => {
+                console.error("Concepts snapshot error:", error);
+                switchToLocalStorageMode(error);
+            });
+
+            // Listen to Votes (Public Data)
+            const votesRef = collection(db, 'artifacts', appId, 'public', 'data', 'votes');
+            onSnapshot(votesRef, (snapshot) => {
+                if (isLocalStorageMode) return;
+                appState.votes = [];
+                snapshot.forEach(docSnap => {
+                    appState.votes.push({ id: docSnap.id, ...docSnap.data() });
+                });
+                
+                setCloudActiveBadge();
+
+                if (!document.getElementById('section-admin').classList.contains('hidden') && !document.getElementById('admin-results-panel').classList.contains('hidden')) {
+                    window.renderAdminPanel();
+                }
+            }, (error) => {
+                console.error("Votes snapshot error:", error);
+                switchToLocalStorageMode(error);
+            });
+        }
+
         window.onload = function() {
             lucide.createIcons();
-            initSurvey();
-            renderAdminPanel();
+            initializeAppWithAuth();
+            window.initSurvey();
         };
 
-        // TOAST NOTIFICATIONS (Replacing alerts for clean user flows)
-        function showToast(message, isError = false) {
+        window.showToast = function(message, isError = false) {
             const toast = document.getElementById('toast');
             const toastMsg = document.getElementById('toast-message');
             const toastIcon = document.getElementById('toast-icon');
@@ -413,9 +543,8 @@
             }, 3000);
         }
 
-        // Custom Confirmation dialog managers (replacing browser-level blocking confirm())
         let onConfirmCallback = null;
-        function showConfirmModal(callback) {
+        window.showConfirmModal = function(callback) {
             onConfirmCallback = callback;
             const modal = document.getElementById('confirm-modal');
             const box = document.getElementById('confirm-modal-box');
@@ -427,7 +556,7 @@
             }, 10);
         }
 
-        function closeConfirmModal(accepted) {
+        window.closeConfirmModal = function(accepted) {
             const modal = document.getElementById('confirm-modal');
             const box = document.getElementById('confirm-modal-box');
             modal.classList.add('opacity-0');
@@ -442,16 +571,13 @@
             }, 200);
         }
 
-        // Main view toggling (Survey Flow vs Admin Panel)
-        function switchMode(mode) {
+        window.switchMode = function(mode) {
             const surveySec = document.getElementById('section-survey');
             const adminSec = document.getElementById('section-admin');
             const thanksSec = document.getElementById('section-thanks');
-            
             const tabSurvey = document.getElementById('tab-survey');
             const tabAdmin = document.getElementById('tab-admin');
 
-            // Reset tab styling
             tabSurvey.className = "px-4 py-2 text-sm font-medium rounded-lg transition duration-200 flex items-center space-x-2 text-slate-600 hover:text-slate-800";
             tabAdmin.className = "px-4 py-2 text-sm font-medium rounded-lg transition duration-200 flex items-center space-x-2 text-slate-600 hover:text-slate-800";
 
@@ -460,24 +586,22 @@
                 adminSec.classList.add('hidden');
                 thanksSec.classList.add('hidden');
                 tabSurvey.classList.add('bg-white', 'text-slate-800', 'shadow-sm');
-                initSurvey();
+                window.initSurvey();
             } else if (mode === 'admin') {
                 surveySec.classList.add('hidden');
                 thanksSec.classList.add('hidden');
                 adminSec.classList.remove('hidden');
                 tabAdmin.classList.add('bg-white', 'text-slate-800', 'shadow-sm');
-                renderAdminPanel();
+                window.renderAdminPanel();
             }
         }
 
-        // Admin subtabs toggling (Analytics vs Concept configuration)
-        function switchAdminTab(subtab) {
+        window.switchAdminTab = function(subtab) {
             const resultsPanel = document.getElementById('admin-results-panel');
             const editorPanel = document.getElementById('admin-editor-panel');
             const tabResultsBtn = document.getElementById('admin-subtab-results');
             const tabEditorBtn = document.getElementById('admin-subtab-editor');
 
-            // Default class resets
             tabResultsBtn.className = "text-sm font-medium text-slate-500 hover:text-slate-800 pb-4 -mb-4";
             tabEditorBtn.className = "text-sm font-medium text-slate-500 hover:text-slate-800 pb-4 -mb-4";
 
@@ -485,35 +609,31 @@
                 resultsPanel.classList.remove('hidden');
                 editorPanel.classList.add('hidden');
                 tabResultsBtn.className = "text-sm font-semibold text-indigo-600 border-b-2 border-indigo-600 pb-4 -mb-4";
-                renderCharts();
+                window.renderCharts();
             } else {
                 resultsPanel.classList.add('hidden');
                 editorPanel.classList.remove('hidden');
                 tabEditorBtn.className = "text-sm font-semibold text-indigo-600 border-b-2 border-indigo-600 pb-4 -mb-4";
-                renderEditorForm();
+                window.renderEditorForm();
             }
         }
 
-        // Build the current step in the survey mode
-        function initSurvey() {
+        window.initSurvey = function() {
             if (appState.concepts.length === 0) {
-                document.getElementById('survey-concept-title').textContent = "No Concepts Found";
-                document.getElementById('survey-concept-desc').textContent = "Please configure concepts in the Admin Panel.";
+                document.getElementById('survey-concept-title').textContent = "Loading Concepts...";
+                document.getElementById('survey-concept-desc').textContent = "Please wait or configure concepts in the Admin Panel.";
                 return;
             }
 
             const currentConcept = appState.concepts[currentStep];
             
-            // Text values update
             document.getElementById('survey-concept-title').textContent = currentConcept.name;
             document.getElementById('survey-concept-desc').textContent = currentConcept.desc || "Review the details and leave a rating.";
             document.getElementById('survey-progress-text').textContent = `${currentStep + 1} of ${appState.concepts.length}`;
             
-            // Progress Bar update
             const progressPct = ((currentStep + 1) / appState.concepts.length) * 100;
             document.getElementById('survey-progress-bar').style.width = `${progressPct}%`;
 
-            // Display images smoothly with desktop-grid and mobile-snap scroll
             const imagesContainer = document.getElementById('survey-images-container');
             imagesContainer.innerHTML = '';
 
@@ -529,12 +649,10 @@
                 imagesContainer.appendChild(imgDiv);
             });
 
-            // Re-set or clear rating status
             currentRating = 0;
-            resetStars();
+            window.resetStars();
             document.getElementById('survey-comment').value = '';
 
-            // Update footer navigations
             const prevBtn = document.getElementById('btn-prev');
             prevBtn.disabled = currentStep === 0;
 
@@ -546,8 +664,7 @@
             }
         }
 
-        // Star interaction hover-states
-        function hoverStars(rating) {
+        window.hoverStars = function(rating) {
             const stars = document.querySelectorAll('.star-btn svg');
             stars.forEach((star, index) => {
                 if (index < rating) {
@@ -561,201 +678,170 @@
             document.getElementById('rating-description').textContent = STAR_LABELS[rating] || "";
         }
 
-        function resetStars() {
-            hoverStars(currentRating);
+        window.resetStars = function() {
+            window.hoverStars(currentRating);
             if (currentRating === 0) {
                 document.getElementById('rating-description').innerHTML = "&nbsp;";
             }
         }
 
-        function setRating(rating) {
+        window.setRating = function(rating) {
             currentRating = rating;
-            hoverStars(rating);
+            window.hoverStars(rating);
         }
 
-        // Next and Prev steps management
-        function prevStep() {
+        window.prevStep = function() {
             if (currentStep > 0) {
                 currentStep--;
-                initSurvey();
+                window.initSurvey();
             }
         }
 
-        // Submitting current rating step and advancing
-        async function submitAndNext() {
-
+        window.submitAndNext = async function() {
             if (currentRating === 0) {
-
-                showToast("Please select at least one star to rate!", true);
-
+                window.showToast("Please select at least one star to rate!", true);
                 return;
-
             }
 
-            const concept = appState.concepts[currentStep];
-
-            const vote = {
-
-                conceptId: concept.id,
-
-                conceptName: concept.name,
-
+            const conceptId = appState.concepts[currentStep].id;
+            const conceptName = appState.concepts[currentStep].name;
+            const comment = document.getElementById('survey-comment').value.trim();
+            
+            sessionVotes.push({
+                conceptId: conceptId,
+                conceptName: conceptName,
                 score: currentRating,
-
-                comment: document
-                    .getElementById("survey-comment")
-                    .value
-                    .trim(),
-
-                timestamp: new Date().toISOString()
-
-            };
-
-            try {
-
-                await saveVote(vote);
-
-            } catch (error) {
-
-                console.error(error);
-
-                showToast("Failed to save vote.", true);
-
-                return;
-
-            }
+                comment: comment,
+                timestamp: new Date().toISOString(),
+                userId: userId || "local-user"
+            });
 
             if (currentStep < appState.concepts.length - 1) {
-
                 currentStep++;
-
-                initSurvey();
-
+                window.initSurvey();
             } else {
+                const btn = document.getElementById('btn-next');
+                btn.disabled = true;
+                btn.innerHTML = `<i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i><span>Saving...</span>`;
+                lucide.createIcons();
 
-                showToast("Your vote has been successfully saved.");
+                if (isLocalStorageMode) {
+                    // Fallback database write action
+                    const votesRef = localStorage.getItem(`conceptrater_votes_${appId}`);
+                    let localVotes = votesRef ? JSON.parse(votesRef) : [];
+                    localVotes.push(...sessionVotes);
+                    localStorage.setItem(`conceptrater_votes_${appId}`, JSON.stringify(localVotes));
+                    appState.votes = localVotes;
 
-                document
-                    .getElementById("section-survey")
-                    .classList.add("hidden");
+                    window.showToast("Votes saved to Local Database!");
+                    document.getElementById('section-survey').classList.add('hidden');
+                    document.getElementById('section-thanks').classList.remove('hidden');
+                    btn.disabled = false;
+                    btn.innerHTML = `<span id="btn-next-text">Submit All Ratings</span><i data-lucide="arrow-right" class="w-4 h-4"></i>`;
+                    lucide.createIcons();
+                    return;
+                }
 
-                document
-                    .getElementById("section-thanks")
-                    .classList.remove("hidden");
-
+                try {
+                    const votesRef = collection(db, 'artifacts', appId, 'public', 'data', 'votes');
+                    for (const vote of sessionVotes) {
+                        await addDoc(votesRef, vote);
+                    }
+                    window.showToast("Votes saved! Thank you.");
+                    document.getElementById('section-survey').classList.add('hidden');
+                    document.getElementById('section-thanks').classList.remove('hidden');
+                } catch (error) {
+                    console.error("Error saving votes to cloud:", error);
+                    window.showToast("Cloud write failed. Saving locally...", true);
+                    switchToLocalStorageMode(error);
+                } finally {
+                    btn.disabled = false;
+                    btn.innerHTML = `<span id="btn-next-text">Submit All Ratings</span><i data-lucide="arrow-right" class="w-4 h-4"></i>`;
+                    lucide.createIcons();
+                }
             }
-
         }
 
-        function restartSurvey() {
+        window.restartSurvey = function() {
             currentStep = 0;
             currentRating = 0;
-            votes = []; // Clear current active voting session
-            switchMode('survey');
+            sessionVotes = [];
+            window.switchMode('survey');
         }
 
-        // Admin Statistics Calculation & Dashboard charts rendering
-        async function renderAdminPanel() {
+        window.renderAdminPanel = function() {
+            const votes = appState.votes;
+            const concepts = appState.concepts;
 
-            const votes = await getVotes();
+            document.getElementById('stat-total-votes').textContent = votes.length;
 
-            const totalVotes = votes.length;
+            let bestConceptName = "—";
+            let maxAvg = 0;
 
-            document.getElementById("admin-total-votes").textContent =
-                totalVotes;
+            if (votes.length > 0) {
+                concepts.forEach(concept => {
+                    const conceptVotes = votes.filter(v => v.conceptId === concept.id);
+                    if (conceptVotes.length > 0) {
+                        const sum = conceptVotes.reduce((acc, v) => acc + v.score, 0);
+                        const avg = sum / conceptVotes.length;
+                        if (avg > maxAvg) {
+                            maxAvg = avg;
+                            bestConceptName = `${concept.name.split(':')[0]} (${avg.toFixed(1)}★)`;
+                        }
+                    }
+                });
+            }
+            document.getElementById('stat-best-concept').textContent = bestConceptName;
 
-            if (totalVotes === 0) {
+            const logsContainer = document.getElementById('feedback-logs');
+            logsContainer.innerHTML = '';
+            
+            const commentsWithText = votes.filter(v => v.comment && v.comment.length > 0).sort((a,b) => new Date(b.timestamp) - new Date(a.timestamp));
+            if (commentsWithText.length === 0) {
+                logsContainer.innerHTML = `<div class="text-slate-400 text-sm py-4 text-center">No comments submitted yet.</div>`;
+            } else {
+                commentsWithText.forEach(vote => {
+                    let starsHTML = '';
+                    for (let i = 0; i < 5; i++) {
+                        const isFilled = i < vote.score;
+                        const colorClass = isFilled ? 'text-amber-400 fill-amber-400' : 'text-slate-200 fill-transparent';
+                        starsHTML += `
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-3.5 h-3.5 ${colorClass} inline">
+                                <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+                            </svg>
+                        `;
+                    }
 
-                document.getElementById("admin-comments").innerHTML =
-                    "<p>No votes yet.</p>";
-
-                return;
-
+                    const logCard = document.createElement('div');
+                    logCard.className = "bg-slate-50 border border-slate-100 p-4 rounded-xl space-y-2";
+                    logCard.innerHTML = `
+                        <div class="flex items-center justify-between text-xs text-slate-500">
+                            <span class="font-semibold text-slate-700">${vote.conceptName}</span>
+                            <span>${starsHTML}</span>
+                        </div>
+                        <p class="text-sm text-slate-600 italic">"${vote.comment}"</p>
+                    `;
+                    logsContainer.appendChild(logCard);
+                });
+                lucide.createIcons();
             }
 
-            const grouped = {};
-
-            votes.forEach(vote => {
-
-                if (!grouped[vote.conceptId]) {
-
-                    grouped[vote.conceptId] = {
-
-                        name: vote.conceptName,
-
-                        total: 0,
-
-                        count: 0
-
-                    };
-
-                }
-
-                grouped[vote.conceptId].total += vote.score;
-
-                grouped[vote.conceptId].count++;
-
-            });
-
-            Object.values(grouped).forEach(item => {
-
-                item.average =
-                    (item.total / item.count).toFixed(2);
-
-            });
-
-            let winner = null;
-
-            Object.values(grouped).forEach(item => {
-
-                if (!winner || item.average > winner.average) {
-
-                    winner = item;
-
-                }
-
-            });
-
-            document.getElementById("admin-best-concept").textContent =
-                winner ? winner.name : "-";
-
-            document.getElementById("admin-average-rating").textContent =
-                winner ? winner.average : "-";
-
-            const comments = votes
-                .filter(v => v.comment && v.comment.trim() !== "")
-                .reverse();
-
-            document.getElementById("admin-comments").innerHTML =
-                comments.length
-                    ? comments.map(v => `
-                        <div class="comment-card">
-                            <strong>${v.conceptName}</strong>
-                            <div>${"⭐".repeat(v.score)}</div>
-                            <p>${v.comment}</p>
-                            <small>${new Date(v.timestamp).toLocaleString()}</small>
-                        </div>
-                    `).join("")
-                    : "<p>No comments yet.</p>";
-
+            window.renderCharts();
         }
 
-        // Constructing Chart.js bars and pies
-        function renderCharts() {
+        window.renderCharts = function() {
             const ctxAvg = document.getElementById('chart-average');
             const ctxStars = document.getElementById('chart-stars-breakdown');
 
             if (!ctxAvg || !ctxStars) return;
 
-            // Destroy existing chart instances to re-render cleanly
             if (chartInstances.avg) chartInstances.avg.destroy();
             if (chartInstances.stars) chartInstances.stars.destroy();
 
             const concepts = appState.concepts;
-            const votes = votes;
+            const votes = appState.votes;
 
-            // Average score calculations per design concept
-            const labels = concepts.map(c => c.name.split(':')[0] || c.name); // Clean names slightly
+            const labels = concepts.map(c => c.name.split(':')[0] || c.name);
             const averageScores = concepts.map(concept => {
                 const cVotes = votes.filter(v => v.conceptId === concept.id);
                 if (cVotes.length === 0) return 0;
@@ -763,13 +849,12 @@
                 return Number((sum / cVotes.length).toFixed(2));
             });
 
-            // 1. Average rating bar chart
             chartInstances.avg = new Chart(ctxAvg, {
                 type: 'bar',
                 data: {
                     labels: labels,
                     datasets: [{
-                        label: 'Average Score (1-5 stars)',
+                        label: 'Average Score',
                         data: averageScores,
                         backgroundColor: 'rgba(79, 70, 229, 0.85)',
                         borderColor: 'rgb(79, 70, 229)',
@@ -782,25 +867,14 @@
                     responsive: true,
                     maintainAspectRatio: false,
                     scales: {
-                        y: {
-                            beginAtZero: true,
-                            max: 5,
-                            grid: { color: '#f1f5f9' },
-                            ticks: { font: { family: 'Inter' } }
-                        },
-                        x: {
-                            grid: { display: false },
-                            ticks: { font: { family: 'Inter' } }
-                        }
+                        y: { beginAtZero: true, max: 5, grid: { color: '#f1f5f9' }, ticks: { font: { family: 'Inter' } } },
+                        x: { grid: { display: false }, ticks: { font: { family: 'Inter' } } }
                     },
-                    plugins: {
-                        legend: { display: false }
-                    }
+                    plugins: { legend: { display: false } }
                 }
             });
 
-            // 2. Stars distribution pie breakdown
-            const starDistribution = [0, 0, 0, 0, 0]; // representing 1, 2, 3, 4, 5 stars
+            const starDistribution = [0, 0, 0, 0, 0];
             votes.forEach(v => {
                 if (v.score >= 1 && v.score <= 5) {
                     starDistribution[v.score - 1]++;
@@ -814,11 +888,11 @@
                     datasets: [{
                         data: starDistribution,
                         backgroundColor: [
-                            'rgba(244, 63, 94, 0.85)',   // 1 Rose
-                            'rgba(249, 115, 22, 0.85)',  // 2 Orange
-                            'rgba(234, 179, 8, 0.85)',   // 3 Yellow
-                            'rgba(14, 165, 233, 0.85)',  // 4 Light blue
-                            'rgba(16, 185, 129, 0.85)'   // 5 Emerald
+                            'rgba(244, 63, 94, 0.85)',
+                            'rgba(249, 115, 22, 0.85)',
+                            'rgba(234, 179, 8, 0.85)',
+                            'rgba(14, 165, 233, 0.85)',
+                            'rgba(16, 185, 129, 0.85)'
                         ],
                         borderWidth: 2,
                         hoverOffset: 4
@@ -827,21 +901,12 @@
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
-                    plugins: {
-                        legend: {
-                            position: 'right',
-                            labels: {
-                                boxWidth: 12,
-                                font: { family: 'Inter', size: 12 }
-                            }
-                        }
-                    }
+                    plugins: { legend: { position: 'right', labels: { boxWidth: 12, font: { family: 'Inter', size: 12 } } } }
                 }
             });
         }
 
-        // Build the dynamic editing forms for custom user images and concepts configuration
-        function renderEditorForm() {
+        window.renderEditorForm = function() {
             const listContainer = document.getElementById('editor-concepts-list');
             listContainer.innerHTML = '';
 
@@ -867,9 +932,9 @@
                     <div class="space-y-2">
                         <span class="text-xs font-semibold text-slate-500 uppercase block">3 Photo URLs:</span>
                         <div class="grid grid-cols-1 gap-2">
-                            <input type="text" id="edit-img-${index}-0" value="${concept.images[0] || ''}" placeholder="Viewpoint 1 URL" class="w-full text-xs px-3 py-2 border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500">
-                            <input type="text" id="edit-img-${index}-1" value="${concept.images[1] || ''}" placeholder="Viewpoint 2 URL" class="w-full text-xs px-3 py-2 border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500">
-                            <input type="text" id="edit-img-${index}-2" value="${concept.images[2] || ''}" placeholder="Viewpoint 3 URL" class="w-full text-xs px-3 py-2 border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500">
+                            <input type="text" id="edit-img-${index}-0" value="${concept.images[0] || ''}" class="w-full text-xs px-3 py-2 border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500">
+                            <input type="text" id="edit-img-${index}-1" value="${concept.images[1] || ''}" class="w-full text-xs px-3 py-2 border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500">
+                            <input type="text" id="edit-img-${index}-2" value="${concept.images[2] || ''}" class="w-full text-xs px-3 py-2 border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500">
                         </div>
                     </div>
                 `;
@@ -877,8 +942,7 @@
             });
         }
 
-        // Save customized images and names back into Database
-        function saveConceptsFromEditor() {
+        window.saveConceptsFromEditor = async function() {
             const updatedConcepts = appState.concepts.map((concept, index) => {
                 return {
                     id: concept.id,
@@ -892,61 +956,86 @@
                 };
             });
 
-            appState.concepts = updatedConcepts;
-            localStorage.setItem('cr_concepts', JSON.stringify(updatedConcepts));
-            
-            showToast("Concepts updated successfully!");
-            switchAdminTab('results');
-        }
-
-        function restoreDefaultConcepts() {
-            appState.concepts = [...DEFAULT_CONCEPTS];
-            localStorage.setItem('cr_concepts', JSON.stringify(DEFAULT_CONCEPTS));
-            showToast("Restored default concepts");
-            renderEditorForm();
-        }
-
-        // Prompt user inside beautiful UI instead of native blocking confirm dialog
-        async function resetAllVotesPrompt() {
-
-            if (!confirm("Delete all votes?")) return;
-
-            try {
-
-                await clearVotes();
-
-                await renderAdminPanel();
-
-                showToast("All votes deleted.");
-
-            } catch (error) {
-
-                console.error(error);
-
-                showToast("Failed to delete votes.", true);
-
+            if (isLocalStorageMode) {
+                localStorage.setItem(`conceptrater_concepts_${appId}`, JSON.stringify(updatedConcepts));
+                appState.concepts = updatedConcepts;
+                window.showToast("Concepts updated locally!");
+                window.switchAdminTab('results');
+                return;
             }
 
+            try {
+                const configRef = doc(db, 'artifacts', appId, 'public', 'config');
+                await setDoc(configRef, { concepts: updatedConcepts });
+                window.showToast("Concepts updated successfully!");
+                window.switchAdminTab('results');
+            } catch (error) {
+                console.error("Error saving concepts:", error);
+                window.showToast("Failed to save concepts. Switching to Local Database...", true);
+                switchToLocalStorageMode(error);
+            }
         }
 
-        // Free client-side CSV file compilation and trigger direct download
-        function exportToCSV() {
-            if (votes.length === 0) {
-                showToast("No votes to export!", true);
+        window.restoreDefaultConcepts = async function() {
+            if (isLocalStorageMode) {
+                localStorage.setItem(`conceptrater_concepts_${appId}`, JSON.stringify(DEFAULT_CONCEPTS));
+                appState.concepts = DEFAULT_CONCEPTS;
+                window.showToast("Restored default concepts locally");
+                window.renderEditorForm();
+                return;
+            }
+
+            try {
+                const configRef = doc(db, 'artifacts', appId, 'public', 'config');
+                await setDoc(configRef, { concepts: DEFAULT_CONCEPTS });
+                window.showToast("Restored default concepts");
+                window.renderEditorForm();
+            } catch (error) {
+                window.showToast("Failed to restore concepts. Switching to Local Database...", true);
+                switchToLocalStorageMode(error);
+            }
+        }
+
+        window.resetAllVotesPrompt = function() {
+            window.showConfirmModal(async () => {
+                if (isLocalStorageMode) {
+                    localStorage.removeItem(`conceptrater_votes_${appId}`);
+                    appState.votes = [];
+                    window.showToast("Local votes successfully reset!");
+                    window.renderAdminPanel();
+                    return;
+                }
+
+                try {
+                    const votesRef = collection(db, 'artifacts', appId, 'public', 'data', 'votes');
+                    const snapshot = await getDocs(votesRef);
+                    snapshot.forEach(async (docSnap) => {
+                        await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'votes', docSnap.id));
+                    });
+                    window.showToast("Votes successfully reset!");
+                } catch (error) {
+                    console.error("Error resetting votes:", error);
+                    window.showToast("Failed to reset votes. Switching to Local Database...", true);
+                    switchToLocalStorageMode(error);
+                }
+            });
+        }
+
+        window.exportToCSV = function() {
+            if (appState.votes.length === 0) {
+                window.showToast("No votes to export!", true);
                 return;
             }
 
             let csvContent = "data:text/csv;charset=utf-8,";
             csvContent += "Concept ID,Concept Name,Score,Comment,Timestamp\n";
 
-            votes.forEach(vote => {
-                // Ensure proper escaping for strings that might have commas or quotes
+            appState.votes.forEach(vote => {
                 const escapedName = `"${vote.conceptName.replace(/"/g, '""')}"`;
                 const escapedComment = `"${(vote.comment || '').replace(/"/g, '""')}"`;
                 csvContent += `${vote.conceptId},${escapedName},${vote.score},${escapedComment},${vote.timestamp}\n`;
             });
 
-            // Trigger click simulation to download file cleanly
             const encodedUri = encodeURI(csvContent);
             const link = document.createElement("a");
             link.setAttribute("href", encodedUri);
@@ -954,7 +1043,7 @@
             document.body.appendChild(link);
             link.click();
             document.body.removeChild(link);
-            showToast("CSV file downloaded successfully!");
+            window.showToast("CSV file downloaded successfully!");
         }
     </script>
 </body>
